@@ -2,50 +2,51 @@ import { ref, computed, reactive } from 'vue'
 import type { GameState, LogEntry, TabType } from '../types/game'
 import { GAME_PARAMS } from '../constants/game'
 
+const STORAGE_KEY = 'oj-simulation-save'
+
+const game = reactive<GameState>({
+  date: { year: GAME_PARAMS.INITIAL.YEAR, month: GAME_PARAMS.INITIAL.MONTH },
+  money: GAME_PARAMS.INITIAL.MONEY,
+  ap: GAME_PARAMS.INITIAL.AP,
+  resources: { rd: 0, acad: 0, comm: 0 },
+  stats: {
+    users: { normal: GAME_PARAMS.INITIAL.USERS, active: 0, core: 0 },
+    problems: { high: 0, mid: 0, low: 0 },
+    total_submissions: 0,
+    total_solutions: 0,
+    reputation: 0,
+    last_month: { subs: 0, sols: 0 },
+    consecutive_failure_months: 0,
+    comm_fail_months: 0,
+    pending_user_bonus: 0
+  },
+  hardware: {
+    server_cores: GAME_PARAMS.INITIAL.SERVER_CORES,
+    judge_cores: GAME_PARAMS.INITIAL.JUDGE_CORES,
+    disk_extra_blocks: 0,
+    disk_used: 0,
+    server_arch: 1,
+    judge_arch: 1
+  },
+  staff: {},
+  class_state: {},
+  features_unlocked: {},
+  flags: {
+    fundraising_penalty_val: 0,
+    temp_rep_penalty: 0,
+    contest_growth_mult: 1.0
+  }
+})
+
+const logs = ref<LogEntry[]>([
+  { message: '💡 欢迎来到 OJ 运维模拟器！', type: 'normal', date: '2013-01' },
+  { message: '请密切关注左侧的【下月预测】面板，避免破产。', type: 'normal', date: '2013-01' }
+])
+
+const activeTab = ref<TabType>('ops')
+const gameOver = ref(false)
+
 export function useGame() {
-  const game = reactive<GameState>({
-    date: { year: GAME_PARAMS.INITIAL.YEAR, month: GAME_PARAMS.INITIAL.MONTH },
-    money: GAME_PARAMS.INITIAL.MONEY,
-    ap: GAME_PARAMS.INITIAL.AP,
-    resources: { rd: 0, acad: 0, comm: 0 },
-    stats: {
-      users: { normal: GAME_PARAMS.INITIAL.USERS, active: 0, core: 0 },
-      problems: { high: 0, mid: 0, low: 0 },
-      total_submissions: 0,
-      total_solutions: 0,
-      reputation: 0,
-      last_month: { subs: 0, sols: 0 },
-      consecutive_failure_months: 0,
-      comm_fail_months: 0,
-      pending_user_bonus: 0
-    },
-    hardware: {
-      server_cores: GAME_PARAMS.INITIAL.SERVER_CORES,
-      judge_cores: GAME_PARAMS.INITIAL.JUDGE_CORES,
-      disk_extra_blocks: 0,
-      disk_used: 0,
-      server_arch: 1,
-      judge_arch: 1
-    },
-    staff: {},
-    class_state: {},
-    features_unlocked: {},
-    flags: {
-      fundraising_penalty_val: 0,
-      temp_rep_penalty: 0,
-      contest_growth_mult: 1.0
-    }
-  })
-
-  const logs = ref<LogEntry[]>([
-    { message: '💡 欢迎来到 OJ 运维模拟器！', type: 'normal', date: '2013-01' },
-    { message: '请密切关注左侧的【下月预测】面板，避免破产。', type: 'normal', date: '2013-01' }
-  ])
-
-  const activeTab = ref<TabType>('ops')
-  const gameOver = ref(false)
-
-  const STORAGE_KEY = 'oj-simulation-save'
 
   const init = () => {
     for (const k in GAME_PARAMS.HIRING) {
@@ -173,6 +174,9 @@ export function useGame() {
     const isFreeEra = game.date.year === 2013 && game.date.month < 7
     addLog(`=== ${game.date.year}年 ${game.date.month}月 ===`, 'warn')
 
+    console.log(`%c=== ${game.date.year}年 ${game.date.month}月 ===`, 'color: #ffd740; font-weight: bold; font-size: 14px')
+    console.log('免费期:', isFreeEra)
+
     if (game.date.year >= 2026) {
       endGame()
       return
@@ -189,6 +193,10 @@ export function useGame() {
         gain[conf.type] += count * conf.gain
       }
     }
+
+    console.log('%c--- 财务结算 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('员工工资:', salary, '| 产出:', gain)
+    console.log('当前员工:', JSON.parse(JSON.stringify(game.staff)))
 
     game.money += GAME_PARAMS.INCOME.MONTHLY_GRANT
     game.money -= salary
@@ -211,6 +219,8 @@ export function useGame() {
     maintain_rd += 20 * (game.hardware.judge_arch - 1)
     game.resources.rd -= maintain_rd
 
+    console.log('研发维护消耗:', maintain_rd)
+
     let hw_cost = game.hardware.disk_extra_blocks * GAME_PARAMS.COSTS.DISK_BLOCK_RENT
     if (!isFreeEra) {
       hw_cost += game.hardware.server_cores * GAME_PARAMS.COSTS.SERVER_CORE_RENT
@@ -218,6 +228,8 @@ export function useGame() {
     }
     game.money -= hw_cost
     if (hw_cost > 0) addLog(`财务: 硬件租金 ${hw_cost}`)
+
+    console.log('硬件租金:', hw_cost, '| 资金余额:', game.money)
 
     let server_arch_bonus = (game.hardware.server_arch - 1) * 100
     let judge_arch_bonus = (game.hardware.judge_arch - 1) * 100
@@ -232,13 +244,22 @@ export function useGame() {
     let server_cap = game.hardware.server_cores * server_cap_unit
     let judge_cap = game.hardware.judge_cores * judge_cap_unit
 
+    console.log('%c--- 服务器状态 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('Web核心:', game.hardware.server_cores, '| 单核容量:', server_cap_unit, '| 总容量:', server_cap)
+    console.log('评测核心:', game.hardware.judge_cores, '| 单核容量:', judge_cap_unit, '| 总容量:', judge_cap)
+
     let u = game.stats.users
     let load = u.active + u.normal / 3 + u.core * 3
     if ([7, 8, 9, 10].includes(game.date.month)) load *= 1.3
 
+    console.log('用户:', { normal: u.normal, active: u.active, core: u.core })
+    console.log('负载:', load, '| Web过载:', load > server_cap, '| 评测过载:', load > judge_cap)
+
     if (game.features_unlocked.api) {
       let total_u = u.normal + u.active + u.core
-      game.money += Math.floor(total_u * 1.0)
+      const apiIncome = Math.floor(total_u * 1.0)
+      game.money += apiIncome
+      console.log('API收入:', apiIncome)
     }
 
     let rep = game.stats.reputation
@@ -251,6 +272,11 @@ export function useGame() {
     if (growth_from_fixed < 0) growth_from_fixed = 0
 
     let new_users = Math.floor(growth_from_pct + growth_from_fixed)
+    console.log('%c--- 用户增长 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('声誉:', rep, '| 增长率:', pct_rate.toFixed(4))
+    console.log('百分比增长:', growth_from_pct.toFixed(2), '| 固定增长:', growth_from_fixed.toFixed(2))
+    console.log('比赛增长倍率:', game.flags.contest_growth_mult)
+
     if (game.flags.contest_growth_mult !== 1.0) {
       new_users = Math.floor(new_users * game.flags.contest_growth_mult)
       game.flags.contest_growth_mult = 1.0
@@ -259,11 +285,13 @@ export function useGame() {
     if (game.stats.pending_user_bonus > 0) {
       new_users += game.stats.pending_user_bonus
       addLog(`推广: 试题扩充吸引了额外 ${game.stats.pending_user_bonus} 名用户`)
+      console.log('题目扩充奖励用户:', game.stats.pending_user_bonus)
       game.stats.pending_user_bonus = 0
     }
 
     u.normal += new_users
     if (new_users > 0) addLog(`用户: 新增 ${new_users} 人`)
+    console.log('新增用户:', new_users, '| 总用户:', total_users + new_users)
 
     let prob_n2a =
       (rep * GAME_PARAMS.USER_BEHAVIOR.UPGRADE_N_A_MULT +
@@ -274,14 +302,19 @@ export function useGame() {
     if (game.features_unlocked.discuss) prob_n2a *= 1.1
     if (game.features_unlocked.team) prob_n2a *= 1.1
 
+    console.log('%c--- 用户流转 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('普通→活跃概率:', prob_n2a.toFixed(4))
+
     let delta_n2a = Math.floor(u.normal * prob_n2a)
     if (delta_n2a > 0) {
       u.normal -= delta_n2a
       u.active += delta_n2a
+      console.log('普通→活跃:', delta_n2a)
     } else {
       let delta_a2n = Math.floor(u.active * Math.abs(prob_n2a))
       u.active -= delta_a2n
       u.normal += delta_a2n
+      console.log('活跃→普通:', delta_a2n)
     }
 
     let prob_a2c = (rep * GAME_PARAMS.USER_BEHAVIOR.UPGRADE_A_C_MULT) / 100
@@ -289,13 +322,17 @@ export function useGame() {
     if (delta_a2c > 0) {
       u.active -= delta_a2c
       u.core += delta_a2c
+      console.log('活跃→核心:', delta_a2c)
     }
 
-    u.normal -= Math.ceil(u.normal / 120)
-    u.active -= Math.ceil(u.active / 60)
+    const churn_normal = Math.ceil(u.normal / 120)
+    const churn_active = Math.ceil(u.active / 60)
+    u.normal -= churn_normal
+    u.active -= churn_active
     let core_churn = Math.ceil(u.core / 36)
     u.core -= core_churn
     u.active += core_churn
+    console.log('流失: 普通-' + churn_normal + ', 活跃-' + churn_active + ', 核心→活跃:' + core_churn)
 
     let subs =
       u.normal * GAME_PARAMS.USER_BEHAVIOR.SUBMISSIONS.normal +
@@ -316,6 +353,8 @@ export function useGame() {
     game.stats.total_solutions += sols_int
     game.stats.last_month.sols = sols_int
 
+    console.log('提交:', subs_int, '| 题解:', sols_int)
+
     let p = game.stats.problems
     let total_prob = p.high + p.mid + p.low
     let disk =
@@ -329,9 +368,17 @@ export function useGame() {
       GAME_PARAMS.INITIAL.DISK_MB +
       game.hardware.disk_extra_blocks * GAME_PARAMS.COSTS.DISK_BLOCK_SIZE_GB * 1024
 
+    console.log('%c--- 硬盘状态 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('硬盘使用:', (disk / 1024).toFixed(2), 'GB /', (disk_cap / 1024).toFixed(2), 'GB')
+    console.log('题目数:', { high: p.high, mid: p.mid, low: p.low, total: total_prob })
+
     let is_disk_full = disk > disk_cap
     let is_server_overload = load > server_cap
     let is_judge_overload = load > judge_cap
+
+    console.log('%c--- 系统状态检查 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('硬盘满:', is_disk_full, '| Web过载:', is_server_overload, '| 评测过载:', is_judge_overload)
+    console.log('连续故障月数:', game.stats.consecutive_failure_months)
 
     if (is_disk_full) addLog('❌ 硬盘已满！数据写入失败！', 'bad')
     if (is_server_overload) addLog('❌ Web服务器过载！', 'bad')
@@ -364,6 +411,10 @@ export function useGame() {
     game.resources.acad -= acad_need
     game.resources.comm -= comm_need
 
+    console.log('%c--- 资源消耗 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('学术需求:', acad_need.toFixed(2), '| 社区需求:', comm_need.toFixed(2))
+    console.log('资源余额:', { rd: game.resources.rd.toFixed(1), acad: game.resources.acad.toFixed(1), comm: game.resources.comm.toFixed(1) })
+
     let acad_gap = game.resources.acad < 0 ? Math.abs(game.resources.acad) : 0
     let comm_gap = game.resources.comm < 0 ? Math.abs(game.resources.comm) : 0
 
@@ -372,13 +423,21 @@ export function useGame() {
       let fine = total_users
       game.money -= fine
       addLog(`⚖️ 监管通知: 因长期社区维护不善，罚款 ${fine} 元！`, 'bad')
+      console.log('%c监管罚款: ' + fine, 'color: #ff5252; font-weight: bold')
       game.stats.comm_fail_months = 0
     }
 
     let server_gap = Math.max(0, load - server_cap)
     let judge_gap = Math.max(0, load - judge_cap)
 
+    console.log('%c--- 声誉计算 ---', 'color: #4fc3f7; font-weight: bold')
+    console.log('学术缺口:', acad_gap.toFixed(2), '| 社区缺口:', comm_gap.toFixed(2))
+    console.log('服务器缺口:', server_gap.toFixed(2), '| 评测缺口:', judge_gap.toFixed(2))
+
     calculateReputation(acad_gap, comm_gap, server_gap, judge_gap, total_prob)
+
+    console.log('新声誉:', game.stats.reputation.toFixed(4))
+    console.log('募捐惩罚:', game.flags.fundraising_penalty_val.toFixed(4), '| 临时惩罚:', game.flags.temp_rep_penalty.toFixed(4))
 
     for (const k in game.class_state) {
       const state = game.class_state[k]
@@ -393,6 +452,12 @@ export function useGame() {
       game.flags.temp_rep_penalty = Math.max(0, game.flags.temp_rep_penalty - 0.1 / 3)
     }
 
+    console.log('%c=== 月末总结 ===', 'color: #69f0ae; font-weight: bold; font-size: 12px')
+    console.log('资金:', game.money, '| 用户:', { normal: u.normal, active: u.active, core: u.core })
+    console.log('题目:', { high: p.high, mid: p.mid, low: p.low })
+    console.log('解锁功能:', Object.keys(game.features_unlocked).filter(k => game.features_unlocked[k]))
+    console.log('----------------------------------------')
+
     if (game.money < 0) {
       alert('资金链断裂！您破产了！')
       gameOver.value = true
@@ -402,22 +467,26 @@ export function useGame() {
   const convertAP = (target: 'rd' | 'acad' | 'comm') => {
     if (game.ap < 10) {
       addLog('AP不足', 'bad')
+      console.warn('AP不足，当前AP:', game.ap)
       return
     }
     game.ap -= 10
     game.resources[target] += 10
     addLog(`行动: 10 AP -> 10 ${target}点`)
+    console.log('资源转化: 10 AP -> 10', target, '| 剩余AP:', game.ap)
   }
 
   const addProblem = (type: 'high' | 'mid' | 'low') => {
     if (game.resources.acad < GAME_PARAMS.COSTS.ADD_PROBLEM_ACAD) {
       addLog('学术不足', 'bad')
+      console.warn('学术不足，当前学术:', game.resources.acad)
       return
     }
     game.resources.acad -= GAME_PARAMS.COSTS.ADD_PROBLEM_ACAD
 
+    let bonus = 0
     if (type === 'mid' || type === 'low') {
-      let bonus = Math.floor(Math.random() * 41) + 10
+      bonus = Math.floor(Math.random() * 41) + 10
       game.stats.pending_user_bonus = (game.stats.pending_user_bonus || 0) + bonus
     }
 
@@ -428,6 +497,7 @@ export function useGame() {
       game.stats.reputation -= 0.001
     }
     addLog(`题库: 增加 ${type} 试题`)
+    console.log('添加题目:', type, '| 奖励用户:', bonus, '| 题库:', game.stats.problems)
   }
 
   const organizeContest = (key: string) => {
@@ -435,6 +505,7 @@ export function useGame() {
     if (!conf) return
     if (game.money < conf.cost || game.resources.acad < conf.acad) {
       addLog('资源不足', 'bad')
+      console.warn('资源不足，需要: $' + conf.cost + ', 学术' + conf.acad, '| 当前: $' + game.money + ', 学术' + game.resources.acad)
       return
     }
     game.money -= conf.cost
@@ -449,10 +520,15 @@ export function useGame() {
     if (conf.growth_mult) game.flags.contest_growth_mult = conf.growth_mult
 
     addLog(`比赛: ${conf.name} (下月增长 x${conf.growth_mult})`)
+    console.log('%c举办比赛: ' + conf.name, 'color: #69f0ae; font-weight: bold')
+    console.log('花费: $' + conf.cost + ', 学术' + conf.acad, '| 增长倍率:', conf.growth_mult)
   }
 
   const fundraising = () => {
-    if (game.ap < 50) return
+    if (game.ap < 50) {
+      console.warn('AP不足，需要50AP，当前:', game.ap)
+      return
+    }
     game.ap -= 50
     const u = game.stats.users
     const total_users = u.normal + u.active + u.core
@@ -462,20 +538,27 @@ export function useGame() {
     game.money += gain
     game.flags.fundraising_penalty_val += 0.2
     addLog(`募捐: 获得 ${gain} 元，声誉受损`, 'bad')
+    console.log('%c募捐: +' + gain + '元', 'color: #ff9800; font-weight: bold')
+    console.log('用户数:', total_users, '| 声誉:', game.stats.reputation, '| 惩罚值:', game.flags.fundraising_penalty_val)
   }
 
   const hire = (key: string) => {
-    if (game.ap < GAME_PARAMS.COSTS.HIRE_AP) return
+    if (game.ap < GAME_PARAMS.COSTS.HIRE_AP) {
+      console.warn('AP不足，需要' + GAME_PARAMS.COSTS.HIRE_AP + 'AP，当前:', game.ap)
+      return
+    }
     const conf = GAME_PARAMS.HIRING[key]
     if (!conf) return
     const current = game.staff[key] ?? 0
     if (current >= conf.limit) {
       addLog('人数已满', 'bad')
+      console.warn('人数已满:', conf.name, '| 上限:', conf.limit)
       return
     }
     game.staff[key] = current + 1
     game.ap -= GAME_PARAMS.COSTS.HIRE_AP
     addLog(`招聘: ${conf.name}`)
+    console.log('招聘:', conf.name, '| 月薪:', conf.cost, '| 产出:', conf.gain, conf.type, '| 当前人数:', game.staff[key])
   }
 
   const expandHardware = (type: 'server' | 'judge' | 'disk', mode: number | 'max') => {
@@ -485,6 +568,7 @@ export function useGame() {
       const count = typeof mode === 'number' ? mode : 1
       game.hardware.disk_extra_blocks += count
       addLog(`硬件: 硬盘扩容 (+${count * 40}GB)`)
+      console.log('硬盘扩容: +' + (count * 40) + 'GB', '| 总额外块数:', game.hardware.disk_extra_blocks)
       return
     }
 
@@ -503,6 +587,7 @@ export function useGame() {
 
     if (count <= 0) {
       addLog('已达到架构上限，无法添加', 'bad')
+      console.warn('已达到架构上限', '| 当前:', current, '| 上限:', limit)
       return
     }
 
@@ -510,6 +595,7 @@ export function useGame() {
       count = limit - current
       if (count <= 0) {
         addLog('核心数已达架构上限，请先升级架构', 'bad')
+        console.warn('核心数已达架构上限，请先升级架构')
         return
       }
     }
@@ -521,6 +607,7 @@ export function useGame() {
     }
 
     addLog(`硬件: ${isServer ? 'Web' : '评测'}核心 +${count}`)
+    console.log('硬件扩容:', isServer ? 'Web' : '评测', '+', count, '| 总数:', isServer ? game.hardware.server_cores : game.hardware.judge_cores)
   }
 
   const upgradeArch = (type: 'server' | 'judge') => {
@@ -529,6 +616,7 @@ export function useGame() {
     const cost_r = 100 * level
     if (game.money < cost_m || game.resources.rd < cost_r) {
       addLog('资源不足', 'bad')
+      console.warn('资源不足，需要: $' + cost_m + ', 研发' + cost_r, '| 当前: $' + game.money + ', 研发' + game.resources.rd)
       return
     }
     game.money -= cost_m
@@ -539,6 +627,8 @@ export function useGame() {
       game.hardware.judge_arch++
     }
     addLog('研发: 架构升级成功', 'good')
+    console.log('%c架构升级成功: ' + (type === 'server' ? 'Web' : '评测'), 'color: #69f0ae; font-weight: bold')
+    console.log('新等级:', type === 'server' ? game.hardware.server_arch : game.hardware.judge_arch)
   }
 
   const unlockFeature = (id: string) => {
@@ -546,12 +636,15 @@ export function useGame() {
     if (!f) return
     if (game.money < f.cost || game.resources.rd < f.rd) {
       addLog('资源不足', 'bad')
+      console.warn('资源不足，需要: $' + f.cost + ', 研发' + f.rd, '| 当前: $' + game.money + ', 研发' + game.resources.rd)
       return
     }
     game.money -= f.cost
     game.resources.rd -= f.rd
     game.features_unlocked[id] = true
     addLog(`解锁: ${f.name}`, 'good')
+    console.log('%c解锁功能: ' + f.name, 'color: #69f0ae; font-weight: bold')
+    console.log('已解锁功能:', Object.keys(game.features_unlocked).filter(k => game.features_unlocked[k]))
   }
 
   const runClass = (id: string) => {
@@ -560,38 +653,52 @@ export function useGame() {
     if (!conf || !st) return
     if (conf.season && !conf.season.includes(game.date.month)) {
       addLog('季节不符 (需7-10月)', 'bad')
+      console.warn('季节不符，当前月份:', game.date.month, '| 需要月份:', conf.season)
       return
     }
-    if (st.cooldown > 0) return
+    if (st.cooldown > 0) {
+      console.warn('冷却中，剩余:', st.cooldown, '月')
+      return
+    }
     if (game.money < conf.req_money || game.resources.acad < conf.req_acad) {
       addLog('无法开课 (资源不足)', 'bad')
+      console.warn('无法开课，需要: $' + conf.req_money + ', 学术' + conf.req_acad, '| 当前: $' + game.money + ', 学术' + game.resources.acad)
       return
     }
 
+    const income = conf.inc_base * st.level
     game.money -= conf.req_money
     game.resources.acad -= conf.req_acad
-    game.money += conf.inc_base * st.level
+    game.money += income
     st.cooldown = 3
     addLog(`网校: ${conf.name} 开课`, 'good')
+    console.log('%c开课成功: ' + conf.name, 'color: #69f0ae; font-weight: bold')
+    console.log('花费: $' + conf.req_money + ', 学术' + conf.req_acad, '| 收入:', income, '| 等级:', st.level)
   }
 
   const upgradeClass = (id: string) => {
     const conf = GAME_PARAMS.CLASSES[id]
     const st = game.class_state[id]
     if (!conf || !st) return
-    if (st.level >= conf.max) return
+    if (st.level >= conf.max) {
+      console.warn('已满级:', conf.name, '| 当前等级:', st.level, '| 最大等级:', conf.max)
+      return
+    }
 
     const cm = conf.cost_base * st.level
     const ca = conf.acad_base * st.level
 
     if (game.money < cm || game.resources.acad < ca) {
       addLog('升级资源不足', 'bad')
+      console.warn('升级资源不足，需要: $' + cm + ', 学术' + ca, '| 当前: $' + game.money + ', 学术' + game.resources.acad)
       return
     }
     game.money -= cm
     game.resources.acad -= ca
     st.level++
     addLog(`网校: 升级 ${conf.name}`, 'good')
+    console.log('%c升级成功: ' + conf.name, 'color: #69f0ae; font-weight: bold')
+    console.log('花费: $' + cm + ', 学术' + ca, '| 新等级:', st.level)
   }
 
   const endGame = () => {
@@ -604,6 +711,11 @@ export function useGame() {
       (3 * p.high + p.mid - p.low) +
       0.01 * game.stats.total_solutions
     const finalScore = score * (game.stats.reputation + 1)
+    console.log('%c=== 游戏结束 ===', 'color: #ffd740; font-weight: bold; font-size: 16px')
+    console.log('最终得分:', finalScore.toFixed(2))
+    console.log('用户:', u)
+    console.log('题目:', p)
+    console.log('声誉:', game.stats.reputation)
     alert(`游戏结束！最终得分: ${finalScore.toFixed(2)}`)
     gameOver.value = true
   }
