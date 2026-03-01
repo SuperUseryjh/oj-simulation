@@ -116,6 +116,12 @@ const getLogClass = (type: string) => {
           [{{ log.date }}] {{ log.message }}
         </div>
       </div>
+
+      <footer class="app-footer">
+        Powered By GLM5 & Nano Banana2<br />
+        Origin By <a href="https://www.luogu.com.cn/article/dcqcee1r" target="_blank">chen_zhe</a><br />
+        Modified By YaoOnion | <a href="https://github.com/SuperUseryjh/oj-simulation" target="_blank">GitHub</a>
+      </footer>
     </div>
   </div>
 </template>
@@ -299,5 +305,23 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #444;
   border-radius: 4px;
+}
+
+.app-footer {
+  padding: 15px;
+  text-align: center;
+  color: #888;
+  font-size: 0.85em;
+  border-top: 1px solid #333;
+  margin-top: auto;
+}
+
+.app-footer a {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  text-decoration: underline;
 }
 </style>
