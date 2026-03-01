@@ -7,13 +7,35 @@ import TabRD from './components/TabRD.vue'
 import TabHR from './components/TabHR.vue'
 import TabEdu from './components/TabEdu.vue'
 
-const { game, logs, activeTab, gameOver, init, nextMonth, switchTab, isBankruptWarning } =
-  useGame()
+const {
+  game,
+  logs,
+  activeTab,
+  gameOver,
+  init,
+  nextMonth,
+  switchTab,
+  isBankruptWarning,
+  saveGame,
+  loadGame,
+  exportGame,
+  importGame,
+  hasSavedGame,
+  deleteSavedGame
+} = useGame()
 
 const logArea = ref<HTMLElement | null>(null)
+const showSavePanel = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
 
 onMounted(() => {
   init()
+  if (hasSavedGame()) {
+    const loaded = loadGame()
+    if (loaded) {
+      addLog('📂 已自动加载上次存档', 'good')
+    }
+  }
 })
 
 const scrollToBottom = async () => {
@@ -23,9 +45,75 @@ const scrollToBottom = async () => {
   }
 }
 
+const addLog = (message: string, type: 'normal' | 'good' | 'bad' | 'warn' = 'normal') => {
+  const dateStr = `${game.date.year}-${String(game.date.month).padStart(2, '0')}`
+  logs.value.push({ message, type, date: dateStr })
+}
+
 const handleNextMonth = () => {
   nextMonth()
+  saveGame()
   scrollToBottom()
+}
+
+const handleSave = () => {
+  saveGame()
+  addLog('💾 游戏已保存', 'good')
+}
+
+const handleLoad = () => {
+  if (hasSavedGame()) {
+    const loaded = loadGame()
+    if (loaded) {
+      addLog('📂 存档已加载', 'good')
+    } else {
+      addLog('❌ 存档加载失败', 'bad')
+    }
+  } else {
+    addLog('❌ 没有找到存档', 'bad')
+  }
+}
+
+const handleNewGame = () => {
+  if (confirm('确定要重新开始吗？当前进度将丢失！')) {
+    deleteSavedGame()
+    location.reload()
+  }
+}
+
+const handleExport = () => {
+  const jsonStr = exportGame()
+  const blob = new Blob([jsonStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `oj-save-${game.date.year}-${String(game.date.month).padStart(2, '0')}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  addLog('📤 存档已导出', 'good')
+}
+
+const handleImport = () => {
+  importInput.value?.click()
+}
+
+const handleFileImport = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const content = e.target?.result as string
+    const success = importGame(content)
+    if (success) {
+      addLog('📥 存档已导入', 'good')
+    } else {
+      addLog('❌ 存档导入失败，文件格式错误', 'bad')
+    }
+  }
+  reader.readAsText(file)
+  input.value = ''
 }
 
 const getLogClass = (type: string) => {
@@ -58,6 +146,21 @@ const getLogClass = (type: string) => {
       <button id="next-month-btn" @click="handleNextMonth" :disabled="gameOver">
         进入下个月
       </button>
+
+      <div class="save-panel">
+        <button class="save-btn" @click="handleSave">💾 保存</button>
+        <button class="save-btn" @click="handleLoad">📂 读取</button>
+        <button class="save-btn" @click="handleExport">📤 导出</button>
+        <button class="save-btn" @click="handleImport">📥 导入</button>
+        <button class="save-btn new-game" @click="handleNewGame">🔄 重开</button>
+        <input
+          ref="importInput"
+          type="file"
+          accept=".json"
+          style="display: none"
+          @change="handleFileImport"
+        />
+      </div>
 
       <div class="tabs">
         <div
@@ -264,7 +367,7 @@ body {
 }
 
 #log-area {
-  height: 200px;
+  height: 350px;
   background: #111;
   font-family: 'Consolas', monospace;
   padding: 12px;
@@ -323,5 +426,37 @@ body {
 
 .app-footer a:hover {
   text-decoration: underline;
+}
+
+.save-panel {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.save-btn {
+  flex: 1;
+  padding: 10px;
+  font-size: 0.95em;
+  font-weight: bold;
+  background-color: var(--accent);
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover {
+  background-color: var(--text);
+  transform: translateY(-1px);
+}
+
+.save-btn.new-game {
+  background-color: #c62828;
+}
+
+.save-btn.new-game:hover {
+  background-color: #b71c1c;
 }
 </style>

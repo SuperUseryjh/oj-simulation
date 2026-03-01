@@ -45,6 +45,8 @@ export function useGame() {
   const activeTab = ref<TabType>('ops')
   const gameOver = ref(false)
 
+  const STORAGE_KEY = 'oj-simulation-save'
+
   const init = () => {
     for (const k in GAME_PARAMS.HIRING) {
       game.staff[k] = 0
@@ -55,6 +57,61 @@ export function useGame() {
     for (const k in GAME_PARAMS.FEATURES) {
       game.features_unlocked[k] = false
     }
+  }
+
+  const saveGame = () => {
+    const saveData = {
+      game: JSON.parse(JSON.stringify(game)),
+      logs: logs.value,
+      gameOver: gameOver.value
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData))
+  }
+
+  const loadGame = (): boolean => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!saved) return false
+
+    try {
+      const saveData = JSON.parse(saved)
+      Object.assign(game, saveData.game)
+      logs.value = saveData.logs
+      gameOver.value = saveData.gameOver
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const exportGame = (): string => {
+    const saveData = {
+      game: JSON.parse(JSON.stringify(game)),
+      logs: logs.value,
+      gameOver: gameOver.value,
+      exportTime: new Date().toISOString()
+    }
+    return JSON.stringify(saveData, null, 2)
+  }
+
+  const importGame = (jsonStr: string): boolean => {
+    try {
+      const saveData = JSON.parse(jsonStr)
+      Object.assign(game, saveData.game)
+      logs.value = saveData.logs
+      gameOver.value = saveData.gameOver
+      saveGame()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const hasSavedGame = (): boolean => {
+    return localStorage.getItem(STORAGE_KEY) !== null
+  }
+
+  const deleteSavedGame = () => {
+    localStorage.removeItem(STORAGE_KEY)
   }
 
   const addLog = (message: string, type: LogEntry['type'] = 'normal') => {
@@ -695,6 +752,12 @@ export function useGame() {
     diskInfo,
     staffOutput,
     isBankruptWarning,
-    switchTab
+    switchTab,
+    saveGame,
+    loadGame,
+    exportGame,
+    importGame,
+    hasSavedGame,
+    deleteSavedGame
   }
 }
